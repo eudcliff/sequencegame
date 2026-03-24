@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Memory Challenge</title>
+<style>
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+  html, body {
+    width:100%; height:100%; background:#0f0f19; overflow:hidden;
+    touch-action:none; user-select:none; -webkit-user-select:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  /* Full-screen column layout: canvas on top, chrome below */
+  #wrap {
+    position:fixed; inset:0;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:flex-start;
+  }
+
+  /* Canvas fills all space not taken by chrome */
+  canvas { display:block; width:100%; flex:1 1 auto; min-height:0; }
+
+  /* ─── Chrome area (buttons/keyboards beneath canvas) ─── */
+  #chrome {
+    flex:0 0 auto;
+    width:100%; display:flex; flex-direction:column;
+    align-items:center; gap:6px;
+    padding:6px 8px 8px;
+    background:#0f0f19;
+  }
+
+  /* ── Toggle buttons ── */
+  #toggles {
+    display:none; flex-direction:column; gap:6px;
+    width:100%; max-width:380px;
+  }
+  #toggles.visible { display:flex; }
+  .tog {
+    font-family:"Consolas","Courier New",monospace;
+    font-size:clamp(12px,3.5vw,15px); color:#646e8c;
+    background:#161826; border:1px solid #323c50; border-radius:8px;
+    padding:10px 14px; cursor:pointer;
+    display:flex; align-items:center; justify-content:space-between;
+    touch-action:manipulation;
+  }
+  .tog .tog-val { font-weight:700; }
+  .tog.on  .tog-val { color:#50dc8c; }
+  .tog.off .tog-val { color:#323c50; }
+  .tog.hc  { border-color:#dc50ff44; }
+  .tog-key { color:#50c8ff; font-weight:700; margin-right:7px; }
+  .tog.hc .tog-key { color:#dc50ff; }
+
+  /* ── Start / confirm buttons ── */
+  .bigbtn {
+    display:none;
+    font-family:"Consolas","Courier New",monospace;
+    font-size:clamp(14px,4vw,19px); font-weight:700;
+    color:#0f0f19; background:#50c8ff;
+    border:none; border-radius:10px; padding:13px 0; cursor:pointer;
+    width:100%; max-width:380px; touch-action:manipulation; transition:background .15s;
+  }
+  .bigbtn.visible { display:block; }
+  .bigbtn.hc  { background:#dc50ff; }
+  .bigbtn:disabled { background:#323c50; color:#646e8c; cursor:default; }
+
+  /* ── Keyboards (shared row style) ── */
+  .kb-wrap {
+    display:none; flex-direction:column; align-items:center;
+    gap:5px; width:100%; max-width:480px;
+  }
+  .kb-wrap.visible { display:flex; }
+  .kb-row {
+    display:flex; justify-content:center; gap:5px; width:100%;
+  }
+
+  /* Digit numpad keys — bigger */
+  .dkey {
+    font-family:"Consolas","Courier New",monospace;
+    font-size:clamp(15px,5vw,22px); font-weight:700;
+    color:#e6e6f0; background:#161826;
+    border:2px solid #323c50; border-radius:8px;
+    width:clamp(48px,13vw,68px); height:clamp(48px,13vw,68px);
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+    touch-action:manipulation; flex-shrink:0;
+  }
+  .dkey:active { background:#323c50; border-color:#50c8ff; }
+
+  /* Letter keys — smaller to fit QWERTY rows */
+  .lkey {
+    font-family:"Consolas","Courier New",monospace;
+    font-size:clamp(11px,3.2vw,16px); font-weight:700;
+    color:#e6e6f0; background:#161826;
+    border:1px solid #323c50; border-radius:6px;
+    width:clamp(26px,8vw,40px); height:clamp(30px,8vw,40px);
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+    touch-action:manipulation; flex-shrink:0;
+  }
+  .lkey:active { background:#323c50; border-color:#50c8ff; }
+  .lkey.del { color:#ff5a5a; border-color:#ff5a5a44; min-width:clamp(40px,11vw,58px); }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div id="chrome">
+    <!-- Splash / Game over -->
+    <div id="toggles">
+      <button class="tog on"  id="tog-s" onclick="toggle('s')">
+        <span><span class="tog-key">[S]</span>Sound</span>
+        <span class="tog-val">ON</span>
+      </button>
+      <button class="tog off" id="tog-x" onclick="toggle('x')">
+        <span><span class="tog-key">[X]</span>Hardcore mode</span>
+        <span class="tog-val">OFF</span>
+      </button>
+    </div>
+    <button id="startbtn"   class="bigbtn"           onclick="startGame()">PRESS TO START</button>
+
+    <!-- Recall: digit numpad -->
+    <div id="numkb" class="kb-wrap"></div>
+
+    <!-- Recall: QWERTY (hardcore) -->
+    <div id="ltrkb" class="kb-wrap"></div>
+
+    <!-- Nick entry: QWERTY -->
+    <div id="nickkb" class="kb-wrap"></div>
+    <button id="nickconfirmbtn" class="bigbtn" disabled onclick="nickConfirm()">CONFIRM  ↵</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  CANVAS  – fills remaining height after chrome
+// ═══════════════════════════════════════════════
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+
+// Logical coordinate space (aspect ratio reference — not fixed size)
+const ASPECT = 800 / 400; // 2:1
+
+// Desktop cap: never wider than this logical width at 1× scale
+const MAX_CSS_W = 800;
+
+let LW = 800, LH = 400; // updated by resize()
+
+function resize(){
+  const dpr = window.devicePixelRatio || 1;
+
+  // Let chrome measure its own natural height
+  const chromeEl = document.getElementById('chrome');
+  const chromeH  = chromeEl.offsetHeight;
+
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  // Available space for canvas
+  const availW = vw;
+  const availH = Math.max(vh - chromeH - 4, 80);
+
+  // On desktop: cap canvas width so it doesn't stretch absurdly wide
+  // On mobile: fill all available width
+  const isMobile = vw < 600;
+  const cssW = isMobile
+    ? availW
+    : Math.min(availW, MAX_CSS_W, availH * ASPECT);
+  const cssH = isMobile
+    ? Math.min(availH, cssW / ASPECT)
+    : cssW / ASPECT;
+
+  canvas.style.width  = Math.round(cssW) + 'px';
+  canvas.style.height = Math.round(cssH) + 'px';
+  canvas.style.flex   = '0 0 auto'; // fixed size, don't stretch
+
+  const pw = Math.round(cssW * dpr);
+  const ph = Math.round(cssH * dpr);
+  canvas.width  = pw;
+  canvas.height = ph;
+
+  // Update logical dimensions so all draw calls scale correctly
+  LW = cssW;
+  LH = cssH;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+window.addEventListener('resize', resize);
+
+// ═══════════════════════════════════════════════
+//  COLOURS & FONTS
+//  Fonts use LW-relative sizes so they scale with canvas
+// ═══════════════════════════════════════════════
+const C = {
+  BG:'#0f0f19', ACCENT:'#50c8ff', DIM:'#323c50', WHITE:'#e6e6f0',
+  GOOD:'#50dc8c', BAD:'#ff5a5a', GOLD:'#ffd23c', PANEL:'#161826',
+  HINT:'#646e8c', HC:'#dc50ff'
+};
+
+// Returns a font string scaled relative to current LW
+function fs(baseAt800, bold=false){
+  const sz = Math.round(baseAt800 * LW / 800);
+  return `${bold?'700':'400'} ${sz}px "Consolas","Courier New",monospace`;
+}
+
+// ═══════════════════════════════════════════════
+//  AUDIO
+// ═══════════════════════════════════════════════
+let audioCtx = null;
+function getAudio(){
+  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  return audioCtx;
+}
+const DIGIT_FREQS = {0:261.6,1:293.7,2:329.6,3:392.0,4:440.0,5:523.3,6:587.3,7:659.3,8:784.0,9:880.0};
+const LETTER_FREQS = {};
+for(let i=0;i<26;i++){
+  const t=i/25;
+  LETTER_FREQS[String.fromCharCode(97+i)]=
+    Math.pow(10, Math.log10(130)+t*(Math.log10(1200)-Math.log10(130)));
+}
+const ALL_FREQS = {...DIGIT_FREQS,...LETTER_FREQS};
+
+function playTone(sym){
+  if(!state.soundEnabled) return;
+  const freq=ALL_FREQS[sym]; if(!freq) return;
+  try{
+    const ac=getAudio(),osc=ac.createOscillator(),gain=ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.type='sine'; osc.frequency.value=freq;
+    const now=ac.currentTime,dur=0.18;
+    gain.gain.setValueAtTime(0.32,now);
+    gain.gain.linearRampToValueAtTime(0.32,now+dur*0.8);
+    gain.gain.linearRampToValueAtTime(0,now+dur);
+    osc.start(now); osc.stop(now+dur);
+  }catch(e){}
+}
+
+// ═══════════════════════════════════════════════
+//  HIGH SCORES
+// ═══════════════════════════════════════════════
+function scoresKey(){ return state.hardcoreMode?'memgame_hc':'memgame_normal'; }
+function loadScores(){
+  try{ return JSON.parse(localStorage.getItem(scoresKey()))||[]; }catch(e){ return []; }
+}
+function saveScores(arr){
+  try{ localStorage.setItem(scoresKey(),JSON.stringify(arr)); }catch(e){}
+}
+function qualifies(score){
+  if(score===0) return false;
+  const s=loadScores();
+  return s.length<5 || score>s[s.length-1].score;
+}
+function insertScore(nick,score){
+  const s=loadScores();
+  s.push({nick:nick.toUpperCase().slice(0,3),score});
+  s.sort((a,b)=>b.score-a.score);
+  s.splice(5);
+  saveScores(s);
+}
+
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+const state = {
+  soundEnabled:true, hardcoreMode:false,
+  screen:'splash',
+  sequence:[], userInput:[], score:0,
+  showIdx:0, showStart:0, showPhase:'flash',
+  FLASH_DUR:450, GAP_DUR:80,
+  wrongFlashEnd:0, correctEnd:0,
+  nickBuf:'',
+};
+
+function getPool(){
+  const d=[0,1,2,3,4,5,6,7,8,9];
+  return state.hardcoreMode?d.concat([...'abcdefghijklmnopqrstuvwxyz']):d;
+}
+function symStr(s){ return String(s); }
+
+// ═══════════════════════════════════════════════
+//  DRAW HELPERS
+// ═══════════════════════════════════════════════
+function txt(t, font, color, x, y, center=false){
+  ctx.font=font; ctx.fillStyle=color;
+  ctx.textBaseline='middle';
+  ctx.textAlign=center?'center':'left';
+  ctx.fillText(t, x, y);
+}
+
+function rrect(x,y,w,h,r,fill,stroke,sw=1.5){
+  ctx.beginPath();
+  if(ctx.roundRect){ ctx.roundRect(x,y,w,h,r); }
+  else{
+    ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+    ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+    ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
+  }
+  if(fill){ctx.fillStyle=fill;ctx.fill();}
+  if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=sw;ctx.stroke();}
+}
+
+function hline(y, x0=LW/2-LW*0.22, x1=LW/2+LW*0.22){
+  ctx.strokeStyle=C.DIM; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x1,y); ctx.stroke();
+}
+
+function computeGrid(n,maxW,maxH,gap){
+  const minBox=Math.round(LW*0.034), maxBox=Math.round(LW*0.068);
+  let best=null;
+  for(let cols=1;cols<=n;cols++){
+    const rows=Math.ceil(n/cols);
+    const bw=Math.min(maxBox,Math.floor((maxW-gap*(cols-1))/cols));
+    const bh=Math.min(maxBox,Math.floor((maxH-gap*(rows-1))/rows));
+    const box=Math.min(bw,bh);
+    if(box<minBox) continue;
+    if(!best||box>best.box) best={cols,rows,box,gap};
+  }
+  return best||{cols:n,rows:1,box:minBox,gap};
+}
+
+function drawGrid(seq,inp,active){
+  const n=seq.length;
+  const pad=LW*0.05;
+  const aW=LW-2*pad;
+  const aH=LH*0.55;
+  const gap=Math.round(LW*0.01);
+  const {cols,box}=computeGrid(n,aW,aH,gap);
+  const rows=Math.ceil(n/cols);
+  const tW=cols*box+(cols-1)*gap, tH=rows*box+(rows-1)*gap;
+  const ox=(LW-tW)/2, oy=LH-tH-LH*0.07;
+  const font=fs(box>=LW*0.055?26:20, true);
+
+  for(let i=0;i<n;i++){
+    const ci=i%cols, ri=Math.floor(i/cols);
+    const x=ox+ci*(box+gap), y=oy+ri*(box+gap);
+    if(!active){
+      rrect(x,y,box,box,5,C.PANEL,C.ACCENT);
+      txt(symStr(seq[i]),font,C.ACCENT,x+box/2,y+box/2,true);
+    } else {
+      if(i<inp.length){
+        const ok=inp[i]===seq[i];
+        rrect(x,y,box,box,5,ok?C.GOOD:C.BAD,null);
+        txt(symStr(inp[i]),font,C.BG,x+box/2,y+box/2,true);
+      } else if(i===inp.length){
+        rrect(x,y,box,box,5,C.PANEL,C.WHITE);
+      } else {
+        rrect(x,y,box,box,5,C.PANEL,C.DIM);
+      }
+    }
+  }
+}
+
+function drawHud(){
+  const lab=state.hardcoreMode?'  ☠ HARDCORE':'';
+  txt(`Level  ${state.sequence.length}${lab}`, fs(18), state.hardcoreMode?C.HC:C.DIM, LW/2, LH*0.06, true);
+}
+
+function drawLeaderboard(cx, topY){
+  const scores=loadScores();
+  const mode=state.hardcoreMode?'HARDCORE':'NORMAL';
+  txt(`── TOP 5  ${mode} ──`, fs(13), C.HINT, cx, topY, true);
+  if(!scores.length){ txt('No scores yet', fs(12), C.DIM, cx, topY+LH*0.06, true); return; }
+  const lh=LH*0.054;
+  scores.forEach((e,i)=>{
+    const y=topY+lh*(i+1);
+    const col=i===0?C.GOLD:C.HINT;
+    const medal=['🥇','🥈','🥉','4.','5.'][i];
+    txt(medal,         fs(12), col, cx-LW*0.14, y, false);
+    txt(e.nick,        fs(12), col, cx-LW*0.09, y, false);
+    txt(String(e.score), fs(12), col, cx+LW*0.10, y, true);
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  SCREENS
+// ═══════════════════════════════════════════════
+function drawSplash(){
+  ctx.fillStyle=C.BG; ctx.fillRect(0,0,LW,LH);
+  txt('MEMORY  CHALLENGE', fs(34,true), state.hardcoreMode?C.HC:C.ACCENT, LW/2, LH*0.13, true);
+  txt('How long can you keep up?', fs(14), C.DIM, LW/2, LH*0.26, true);
+  hline(LH*0.35);
+  drawLeaderboard(LW/2, LH*0.4);
+}
+
+function drawGameOver(){
+  const msgs=['Better luck next time!','Keep practising!','Nice memory!','Impressive!','Outstanding memory!'];
+  const msg=msgs[Math.min(4,Math.floor(state.score/3))];
+  const label=state.score!==1?'symbols':'symbol';
+  ctx.fillStyle=C.BG; ctx.fillRect(0,0,LW,LH);
+  txt('GAME  OVER', fs(34,true), C.BAD, LW/2, LH*0.13, true);
+  txt(msg, fs(18), C.GOLD, LW/2, LH*0.26, true);
+  txt(`You remembered  ${state.score}  ${label}  in a row`, fs(22,true), C.WHITE, LW/2, LH*0.38, true);
+  hline(LH*0.48);
+  drawLeaderboard(LW/2, LH*0.52);
+}
+
+function drawNickEntry(){
+  ctx.fillStyle=C.BG; ctx.fillRect(0,0,LW,LH);
+  txt('🏆  NEW HIGH SCORE!', fs(28,true), C.GOLD, LW/2, LH*0.16, true);
+  txt(`Score:  ${state.score}`, fs(22,true), C.WHITE, LH*0.28, LH*0.3, true);
+  txt('Enter your 3-letter nickname', fs(14), C.HINT, LW/2, LH*0.44, true);
+  // Three slots
+  const slotW=LW*0.09, slotH=LH*0.22, gap=LW*0.025;
+  const totalW=3*slotW+2*gap;
+  const ox=(LW-totalW)/2, sy=LH*0.53;
+  for(let i=0;i<3;i++){
+    const x=ox+i*(slotW+gap);
+    const filled=i<state.nickBuf.length;
+    rrect(x,sy,slotW,slotH,6,C.PANEL,filled?C.ACCENT:C.DIM, filled?2:1);
+    if(filled){
+      txt(state.nickBuf[i].toUpperCase(), fs(26,true), C.ACCENT, x+slotW/2, sy+slotH/2, true);
+    } else if(i===state.nickBuf.length){
+      const blink=Math.floor(Date.now()/500)%2===0;
+      if(blink) txt('_', fs(26,true), C.DIM, x+slotW/2, sy+slotH/2, true);
+    }
+  }
+  const hint=state.nickBuf.length===3?'Press ENTER or tap CONFIRM':'Type 3 letters using keyboard or buttons below';
+  txt(hint, fs(12), C.HINT, LW/2, sy+slotH+LH*0.07, true);
+}
+
+function drawRecall(){
+  ctx.fillStyle=C.BG; ctx.fillRect(0,0,LW,LH);
+  drawHud();
+  txt('Repeat the sequence', fs(18), C.DIM, LW/2, LH*0.25, true);
+  drawGrid(state.sequence, state.userInput, true);
+}
+
+function drawCorrect(){
+  ctx.fillStyle=C.BG; ctx.fillRect(0,0,LW,LH);
+  txt('✓  Correct!', fs(26,true), C.GOOD, LW/2, LH/2, true);
+}
+
+function drawWrongFlash(){
+  ctx.fillStyle=C.BG; ctx.fillRect(0,0,LW,LH);
+  drawHud();
+  txt('Repeat the sequence', fs(18), C.DIM, LW/2, LH*0.25, true);
+  drawGrid(state.sequence, state.userInput, true);
+}
+
+function drawShow(sym, isNew, t){
+  const br=180+75*Math.abs(1-2*t), r=br/255;
+  const base=isNew?[255,210,60]:[80,200,255];
+  ctx.fillStyle=C.BG; ctx.fillRect(0,0,LW,LH);
+  txt(symStr(sym), fs(110,true), `rgb(${base.map(v=>Math.round(v*r)).join(',')})`, LW/2, LH*0.52, true);
+}
+
+// ═══════════════════════════════════════════════
+//  CHROME VISIBILITY
+// ═══════════════════════════════════════════════
+function showEl(id,v){ document.getElementById(id).classList.toggle('visible',v); }
+
+function setChrome(screen){
+  showEl('toggles',        screen==='splash'||screen==='gameover');
+  showEl('startbtn',       screen==='splash'||screen==='gameover');
+  showEl('numkb',          screen==='recall'&&!state.hardcoreMode);
+  showEl('ltrkb',          screen==='recall'&&state.hardcoreMode);
+  showEl('nickkb',         screen==='nick');
+  showEl('nickconfirmbtn', screen==='nick');
+  // After chrome changes, re-measure and resize
+  requestAnimationFrame(resize);
+}
+
+// ═══════════════════════════════════════════════
+//  TOGGLE BUTTONS
+// ═══════════════════════════════════════════════
+function toggle(key){
+  if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume();
+  if(key==='s') state.soundEnabled=!state.soundEnabled;
+  if(key==='x'){ state.hardcoreMode=!state.hardcoreMode; buildRecallKbs(); }
+  updateTogglesUI();
+}
+function updateTogglesUI(){
+  [{id:'tog-s',on:state.soundEnabled,hc:false},{id:'tog-x',on:state.hardcoreMode,hc:true}]
+  .forEach(({id,on,hc})=>{
+    const el=document.getElementById(id); if(!el)return;
+    el.className='tog '+(on?'on':'off')+(hc?' hc':'');
+    el.querySelector('.tog-val').textContent=on?'ON':'OFF';
+  });
+  const sb=document.getElementById('startbtn');
+  sb.className='bigbtn visible'+(state.hardcoreMode?' hc':'');
+}
+
+// ═══════════════════════════════════════════════
+//  KEYBOARD BUILDERS
+// ═══════════════════════════════════════════════
+const QWERTY_ROWS  = ['qwertyuiop','asdfghjkl','zxcvbnm'].map(r=>r.split(''));
+const NUMPAD_ROWS  = [[7,8,9],[4,5,6],[1,2,3],[0]];
+
+function makeBtn(label, cls, cb){
+  const b=document.createElement('button');
+  b.className=cls; b.textContent=label; b.type='button';
+  b.addEventListener('pointerdown',e=>{ e.preventDefault(); cb(); });
+  return b;
+}
+
+function buildRows(container, rows, keyCls, onKey, trailingBtn=null){
+  container.innerHTML='';
+  rows.forEach((row,ri)=>{
+    const rowDiv=document.createElement('div');
+    rowDiv.className='kb-row';
+    row.forEach(sym=>{
+      rowDiv.appendChild(makeBtn(String(sym).toUpperCase(), keyCls, ()=>onKey(sym)));
+    });
+    if(trailingBtn && ri===rows.length-1) rowDiv.appendChild(trailingBtn());
+    container.appendChild(rowDiv);
+  });
+}
+
+function buildRecallKbs(){
+  // Digit numpad
+  buildRows(document.getElementById('numkb'), NUMPAD_ROWS, 'dkey', sym=>{
+    if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume();
+    if(state.screen==='recall') handleRecallInput(sym);
+  });
+  // QWERTY (hardcore: digit row on top)
+  const hcRows=[...[0,1,2,3,4,5,6,7,8,9]].map(n=>n)
+    ? [[0,1,2,3,4,5,6,7,8,9],...QWERTY_ROWS]
+    : QWERTY_ROWS;
+  buildRows(document.getElementById('ltrkb'), hcRows, 'lkey', sym=>{
+    if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume();
+    if(state.screen==='recall') handleRecallInput(sym);
+  });
+}
+
+function buildNickKb(){
+  buildRows(
+    document.getElementById('nickkb'),
+    QWERTY_ROWS, 'lkey',
+    ch=>nickType(typeof ch==='string'?ch:String.fromCharCode(97+ch)),
+    ()=>makeBtn('⌫','lkey del',()=>nickDel())
+  );
+}
+
+// ═══════════════════════════════════════════════
+//  NICK LOGIC
+// ═══════════════════════════════════════════════
+function nickType(ch){
+  if(state.screen!=='nick') return;
+  if(state.nickBuf.length<3 && /^[a-z]$/i.test(ch)){
+    state.nickBuf+=ch.toLowerCase();
+    document.getElementById('nickconfirmbtn').disabled=(state.nickBuf.length!==3);
+  }
+}
+function nickDel(){
+  if(state.screen!=='nick'||!state.nickBuf.length) return;
+  state.nickBuf=state.nickBuf.slice(0,-1);
+  document.getElementById('nickconfirmbtn').disabled=true;
+}
+function nickConfirm(){
+  if(state.nickBuf.length!==3) return;
+  insertScore(state.nickBuf, state.score);
+  goGameOver();
+}
+function goGameOver(){
+  state.screen='gameover';
+  setChrome('gameover');
+  updateTogglesUI();
+}
+
+// ═══════════════════════════════════════════════
+//  GAME FLOW
+// ═══════════════════════════════════════════════
+function startGame(){
+  if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume();
+  state.sequence=[]; state.userInput=[]; state.score=0;
+  const pool=getPool();
+  state.sequence.push(pool[Math.floor(Math.random()*pool.length)]);
+  state.screen='show';
+  state.showIdx=0; state.showStart=performance.now(); state.showPhase='flash';
+  playTone(state.sequence[0]);
+  setChrome('show');
+}
+
+function startRecall(){
+  state.screen='recall'; state.userInput=[];
+  setChrome('recall');
+}
+
+function handleRecallInput(sym){
+  playTone(sym);
+  state.userInput.push(sym);
+  const idx=state.userInput.length-1;
+  const ok=state.userInput[idx]===state.sequence[idx];
+  if(!ok){
+    state.screen='wrongFlash';
+    state.wrongFlashEnd=performance.now()+750;
+    setChrome('wrongFlash');
+  } else if(state.userInput.length===state.sequence.length){
+    state.score++;
+    state.screen='correct';
+    state.correctEnd=performance.now()+400;
+    setChrome('correct');
+  }
+}
+
+function endGame(){
+  if(qualifies(state.score)){
+    state.nickBuf='';
+    state.screen='nick';
+    buildNickKb();
+    document.getElementById('nickconfirmbtn').disabled=true;
+    setChrome('nick');
+  } else {
+    goGameOver();
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  MAIN LOOP
+// ═══════════════════════════════════════════════
+function loop(now){
+  requestAnimationFrame(loop);
+  switch(state.screen){
+    case 'splash':   drawSplash();   break;
+    case 'gameover': drawGameOver(); break;
+    case 'recall':   drawRecall();   break;
+    case 'nick':     drawNickEntry();break;
+    case 'correct':
+      drawCorrect();
+      if(now>=state.correctEnd){
+        const pool=getPool();
+        state.sequence.push(pool[Math.floor(Math.random()*pool.length)]);
+        state.screen='show';
+        state.showIdx=0; state.showStart=performance.now(); state.showPhase='flash';
+        playTone(state.sequence[0]);
+        setChrome('show');
+      }
+      break;
+    case 'wrongFlash':
+      drawWrongFlash();
+      if(now>=state.wrongFlashEnd) endGame();
+      break;
+    case 'show':{
+      const el=now-state.showStart;
+      const sym=state.sequence[state.showIdx];
+      const isNew=state.showIdx===state.sequence.length-1;
+      if(state.showPhase==='flash'){
+        if(el>=state.FLASH_DUR){
+          if(isNew) startRecall();
+          else{ state.showPhase='gap'; state.showStart=now; }
+        } else { drawShow(sym,isNew,el/state.FLASH_DUR); }
+      } else {
+        ctx.fillStyle=C.BG; ctx.fillRect(0,0,LW,LH);
+        if(el>=state.GAP_DUR){
+          state.showIdx++; state.showPhase='flash'; state.showStart=now;
+          playTone(state.sequence[state.showIdx]);
+        }
+      }
+      break;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  INPUT
+// ═══════════════════════════════════════════════
+document.addEventListener('keydown', e=>{
+  if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume();
+
+  if(state.screen==='nick'){
+    if(/^[a-zA-Z]$/.test(e.key)){ e.preventDefault(); nickType(e.key); }
+    else if(e.key==='Backspace'){ e.preventDefault(); nickDel(); }
+    else if(e.key==='Enter'){ e.preventDefault(); nickConfirm(); }
+    return;
+  }
+  if(state.screen==='splash'||state.screen==='gameover'){
+    const k=e.key.toLowerCase();
+    if(k==='s'){ toggle('s'); return; }
+    if(k==='x'){ toggle('x'); return; }
+    if(e.key==='Enter'||e.key===' '){ e.preventDefault(); startGame(); }
+    return;
+  }
+  if(state.screen==='recall'){
+    let sym=null;
+    if(/^[0-9]$/.test(e.key)) sym=parseInt(e.key,10);
+    else if(state.hardcoreMode&&/^[a-zA-Z]$/.test(e.key)) sym=e.key.toLowerCase();
+    if(sym!==null) handleRecallInput(sym);
+  }
+});
+
+canvas.addEventListener('pointerdown', e=>{
+  if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume();
+  if(state.screen==='splash'||state.screen==='gameover') startGame();
+});
+
+// ═══════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════
+buildRecallKbs();
+buildNickKb();
+setChrome('splash');
+updateTogglesUI();
+resize();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
