@@ -3,9 +3,41 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Memory Challenge</title>
+<title>4ut1sm</title>
+<link rel="preload" href="./fonts/VT323-Regular.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="./fonts/Silkscreen-Regular.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="./fonts/Audiowide-Regular.ttf" as="font" type="font/ttf" crossorigin>
 <style>
   *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+  @font-face {
+    font-family:"MemoryCRT";
+    src:url("./fonts/VT323-Regular.ttf") format("truetype");
+    font-weight:400;
+    font-style:normal;
+    font-display:swap;
+  }
+
+  @font-face {
+    font-family:"MemoryArcade";
+    src:url("./fonts/Silkscreen-Regular.ttf") format("truetype");
+    font-weight:400;
+    font-style:normal;
+    font-display:swap;
+  }
+
+  @font-face {
+    font-family:"MemorySciFi";
+    src:url("./fonts/Audiowide-Regular.ttf") format("truetype");
+    font-weight:400;
+    font-style:normal;
+    font-display:swap;
+  }
+
+  :root {
+    --ui-font:"MemoryCRT","IBM Plex Mono","Menlo","Monaco","Consolas","Courier New",monospace;
+    --ui-scale:1;
+  }
 
   html, body {
     width:100%; height:100%; background:#0f0f19; overflow:hidden;
@@ -32,35 +64,60 @@
     background:#0f0f19;
   }
 
+  #booterr {
+    position:fixed;
+    top:12px;
+    left:12px;
+    right:12px;
+    z-index:20;
+    display:none;
+    padding:12px 14px;
+    border:1px solid #ff5a5a66;
+    border-radius:10px;
+    background:#2a1116;
+    color:#ffd7d7;
+    font-family:var(--ui-font);
+    font-size:14px;
+    line-height:1.35;
+    white-space:pre-wrap;
+  }
+  #booterr.visible { display:block; }
+
   /* ── Toggle buttons ── */
   #toggles {
     display:none; flex-direction:column; gap:6px;
-    width:100%; max-width:380px;
+    width:100%; max-width:420px;
   }
   #toggles.visible { display:flex; }
   .tog {
-    font-family:"Consolas","Courier New",monospace;
-    font-size:clamp(12px,3.5vw,15px); color:#646e8c;
+    font-family:var(--ui-font);
+    font-size:calc(clamp(15px,4.3vw,19px) * var(--ui-scale)); color:#a8b4d8;
+    font-variant-numeric:slashed-zero;
     background:#161826; border:1px solid #323c50; border-radius:8px;
     padding:10px 14px; cursor:pointer;
     display:flex; align-items:center; justify-content:space-between;
-    touch-action:manipulation;
+    gap:12px; touch-action:manipulation;
+    white-space:nowrap;
   }
+  .tog > span:first-child { flex:1 1 auto; min-width:0; }
+  .tog > .tog-val { flex:0 0 auto; }
   .tog .tog-val { font-weight:700; }
   .tog.on  .tog-val { color:#50dc8c; }
   .tog.off .tog-val { color:#323c50; }
   .tog.hc  { border-color:#dc50ff44; }
   .tog-key { color:#50c8ff; font-weight:700; margin-right:7px; }
   .tog.hc .tog-key { color:#dc50ff; }
+  #tog-f { font-size:calc(clamp(13px,3.6vw,16px) * var(--ui-scale)); }
 
   /* ── Start / confirm buttons ── */
   .bigbtn {
     display:none;
-    font-family:"Consolas","Courier New",monospace;
-    font-size:clamp(14px,4vw,19px); font-weight:700;
+    font-family:var(--ui-font);
+    font-size:calc(clamp(16px,4.5vw,21px) * var(--ui-scale)); font-weight:700;
+    font-variant-numeric:slashed-zero;
     color:#0f0f19; background:#50c8ff;
     border:none; border-radius:10px; padding:13px 0; cursor:pointer;
-    width:100%; max-width:380px; touch-action:manipulation; transition:background .15s;
+    width:100%; max-width:420px; touch-action:manipulation; transition:background .15s;
   }
   .bigbtn.visible { display:block; }
   .bigbtn.hc  { background:#dc50ff; }
@@ -78,8 +135,9 @@
 
   /* Digit numpad keys — bigger */
   .dkey {
-    font-family:"Consolas","Courier New",monospace;
-    font-size:clamp(15px,5vw,22px); font-weight:700;
+    font-family:var(--ui-font);
+    font-size:calc(clamp(15px,5vw,22px) * var(--ui-scale)); font-weight:700;
+    font-variant-numeric:slashed-zero;
     color:#e6e6f0; background:#161826;
     border:2px solid #323c50; border-radius:8px;
     width:clamp(48px,13vw,68px); height:clamp(48px,13vw,68px);
@@ -90,8 +148,9 @@
 
   /* Letter keys — smaller to fit QWERTY rows */
   .lkey {
-    font-family:"Consolas","Courier New",monospace;
-    font-size:clamp(11px,3.2vw,16px); font-weight:700;
+    font-family:var(--ui-font);
+    font-size:calc(clamp(11px,3.2vw,16px) * var(--ui-scale)); font-weight:700;
+    font-variant-numeric:slashed-zero;
     color:#e6e6f0; background:#161826;
     border:1px solid #323c50; border-radius:6px;
     width:clamp(26px,8vw,40px); height:clamp(30px,8vw,40px);
@@ -100,9 +159,41 @@
   }
   .lkey:active { background:#323c50; border-color:#50c8ff; }
   .lkey.del { color:#ff5a5a; border-color:#ff5a5a44; min-width:clamp(40px,11vw,58px); }
+
+  @media (max-width:600px) and (orientation:portrait) {
+    #chrome {
+      gap:8px;
+      padding:8px 10px 10px;
+    }
+
+    #toggles,
+    .bigbtn,
+    #numkb,
+    #ltrkb,
+    #nickkb {
+      width:100%;
+      max-width:none;
+    }
+
+    #numkb.visible {
+      min-height:calc(46vh - 28px);
+      justify-content:space-evenly;
+    }
+
+    #numkb .kb-row {
+      gap:8px;
+    }
+
+    .dkey {
+      width:clamp(72px,24vw,104px);
+      height:clamp(72px,10.5vh,96px);
+      font-size:clamp(24px,7vw,32px);
+    }
+  }
 </style>
 </head>
 <body>
+<div id="booterr"></div>
 <div id="wrap">
   <canvas id="c"></canvas>
   <div id="chrome">
@@ -115,6 +206,10 @@
       <button class="tog off" id="tog-x" onclick="toggle('x')">
         <span><span class="tog-key">[X]</span>Hardcore mode</span>
         <span class="tog-val">OFF</span>
+      </button>
+      <button class="tog on" id="tog-f" onclick="toggle('f')">
+        <span><span class="tog-key">[F]</span>Font theme</span>
+        <span class="tog-val">CRT TERMINAL</span>
       </button>
     </div>
     <button id="startbtn"   class="bigbtn"           onclick="startGame()">PRESS TO START</button>
@@ -146,6 +241,10 @@ const MAX_CSS_W = 800;
 
 let LW = 800, LH = 400; // updated by resize()
 
+function isPortraitMobile(){
+  return window.innerWidth < 600 && window.innerHeight > window.innerWidth;
+}
+
 function resize(){
   const dpr = window.devicePixelRatio || 1;
 
@@ -160,15 +259,16 @@ function resize(){
   const availW = vw;
   const availH = Math.max(vh - chromeH - 4, 80);
 
-  // On desktop: cap canvas width so it doesn't stretch absurdly wide
-  // On mobile: fill all available width
+  // Portrait mobile gets a taller canvas so the top half stays readable.
+  // Wider layouts keep the original 2:1 presentation.
+  const portraitMobile = isPortraitMobile();
   const isMobile = vw < 600;
-  const cssW = isMobile
+  const cssW = portraitMobile
     ? availW
-    : Math.min(availW, MAX_CSS_W, availH * ASPECT);
-  const cssH = isMobile
-    ? Math.min(availH, cssW / ASPECT)
-    : cssW / ASPECT;
+    : (isMobile ? availW : Math.min(availW, MAX_CSS_W, availH * ASPECT));
+  const cssH = portraitMobile
+    ? Math.min(availH, Math.max(220, vh * 0.5))
+    : (isMobile ? Math.min(availH, cssW / ASPECT) : cssW / ASPECT);
 
   canvas.style.width  = Math.round(cssW) + 'px';
   canvas.style.height = Math.round(cssH) + 'px';
@@ -194,13 +294,36 @@ window.addEventListener('resize', resize);
 const C = {
   BG:'#0f0f19', ACCENT:'#50c8ff', DIM:'#323c50', WHITE:'#e6e6f0',
   GOOD:'#50dc8c', BAD:'#ff5a5a', GOLD:'#ffd23c', PANEL:'#161826',
-  HINT:'#646e8c', HC:'#dc50ff'
+  HINT:'#a8b4d8', HC:'#dc50ff'
 };
+
+const FONT_THEMES = [
+  {
+    label:'CRT TERMINAL',
+    stack:'"MemoryCRT","IBM Plex Mono","Menlo","Monaco","Consolas","Courier New",monospace',
+    scale:1.5
+  },
+  {
+    label:'ARCADE CABINET',
+    stack:'"MemoryArcade","MemoryCRT","Menlo","Monaco","Consolas","Courier New",monospace',
+    scale:1
+  },
+  {
+    label:'RETRO SCI-FI',
+    stack:'"MemorySciFi","IBM Plex Mono","Menlo","Monaco","Consolas","Courier New",monospace',
+    scale:1
+  }
+];
 
 // Returns a font string scaled relative to current LW
 function fs(baseAt800, bold=false){
-  const sz = Math.round(baseAt800 * LW / 800);
-  return `${bold?'700':'400'} ${sz}px "Consolas","Courier New",monospace`;
+  const sz = Math.round(baseAt800 * LW * FONT_THEMES[state.fontTheme].scale / 800);
+  return `${bold?'700':'400'} ${sz}px ${FONT_THEMES[state.fontTheme].stack}`;
+}
+
+function displayText(value){
+  const text = String(value);
+  return state.fontTheme===1 ? text.replace(/0/g,'Ø') : text;
 }
 
 // ═══════════════════════════════════════════════
@@ -239,24 +362,98 @@ function playTone(sym){
 // ═══════════════════════════════════════════════
 //  HIGH SCORES
 // ═══════════════════════════════════════════════
-function scoresKey(){ return state.hardcoreMode?'memgame_hc':'memgame_normal'; }
+const SUPABASE_URL = 'https://unbtpzgivdlfoizwmzbd.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Kd7cwk03DYhqz3gCHxvszw_T22L_ICK';
+const SUPABASE_HEADERS = {
+  apikey: SUPABASE_KEY,
+  Authorization: `Bearer ${SUPABASE_KEY}`,
+};
+
+function showBootError(message){
+  const el = document.getElementById('booterr');
+  if(!el) return;
+  el.textContent = String(message);
+  el.classList.add('visible');
+}
+
+window.addEventListener('error', event=>{
+  const msg = event && event.message ? event.message : 'Unknown startup error';
+  showBootError(`Script error:\n${msg}`);
+});
+
+function currentMode(){
+  return state.hardcoreMode ? 'hardcore' : 'normal';
+}
+
 function loadScores(){
-  try{ return JSON.parse(localStorage.getItem(scoresKey()))||[]; }catch(e){ return []; }
+  const params = new URLSearchParams({
+    select:'nick,score,created_at',
+    mode:`eq.${currentMode()}`,
+    order:'score.desc,created_at.asc',
+    limit:'5',
+  });
+
+  return fetch(`${SUPABASE_URL}/rest/v1/scores?${params.toString()}`, {
+    headers:{
+      ...SUPABASE_HEADERS,
+      Accept:'application/json',
+    },
+  }).then(response=>
+    response.json().catch(()=>null).then(data=>{
+      if(!response.ok){
+        const msg = data && data.message ? data.message : `HTTP ${response.status}`;
+        throw new Error(msg);
+      }
+      return Array.isArray(data) ? data : [];
+    })
+  );
 }
-function saveScores(arr){
-  try{ localStorage.setItem(scoresKey(),JSON.stringify(arr)); }catch(e){}
+
+function refreshLeaderboard(){
+  state.leaderboardLoading = true;
+  state.leaderboardError = '';
+  state.leaderboardMode = currentMode();
+  return loadScores()
+    .then(scores=>{
+      state.leaderboard = scores;
+    })
+    .catch(error=>{
+      console.error('Leaderboard refresh failed:', error);
+      state.leaderboard = [];
+      state.leaderboardError = 'Leaderboard unavailable';
+    })
+    .finally(()=>{
+      state.leaderboardLoading = false;
+    });
 }
+
 function qualifies(score){
   if(score===0) return false;
-  const s=loadScores();
+  const s=state.leaderboard;
+  if(state.leaderboardLoading || state.leaderboardError) return false;
   return s.length<5 || score>s[s.length-1].score;
 }
+
 function insertScore(nick,score){
-  const s=loadScores();
-  s.push({nick:nick.toUpperCase().slice(0,3),score});
-  s.sort((a,b)=>b.score-a.score);
-  s.splice(5);
-  saveScores(s);
+  return fetch(`${SUPABASE_URL}/rest/v1/scores`, {
+    method:'POST',
+    headers:{
+      ...SUPABASE_HEADERS,
+      'Content-Type':'application/json',
+      Prefer:'return=minimal',
+    },
+    body:JSON.stringify({
+      nick:nick.toUpperCase().slice(0,3),
+      score,
+      mode:currentMode(),
+    }),
+  }).then(response=>
+    response.json().catch(()=>null).then(data=>{
+      if(response.ok) return;
+      const msg = data && data.message ? data.message : `HTTP ${response.status}`;
+      throw new Error(msg);
+    })
+  );
 }
 
 // ═══════════════════════════════════════════════
@@ -264,12 +461,18 @@ function insertScore(nick,score){
 // ═══════════════════════════════════════════════
 const state = {
   soundEnabled:true, hardcoreMode:false,
+  fontTheme:0,
   screen:'splash',
   sequence:[], userInput:[], score:0,
   showIdx:0, showStart:0, showPhase:'flash',
   FLASH_DUR:450, GAP_DUR:80,
   wrongFlashEnd:0, correctEnd:0,
   nickBuf:'',
+  leaderboard:[],
+  leaderboardLoading:false,
+  leaderboardError:'',
+  leaderboardMode:'normal',
+  finishingGame:false,
 };
 
 function getPool(){
@@ -285,7 +488,7 @@ function txt(t, font, color, x, y, center=false){
   ctx.font=font; ctx.fillStyle=color;
   ctx.textBaseline='middle';
   ctx.textAlign=center?'center':'left';
-  ctx.fillText(t, x, y);
+  ctx.fillText(displayText(t), x, y);
 }
 
 function rrect(x,y,w,h,r,fill,stroke,sw=1.5){
@@ -354,22 +557,24 @@ function drawGrid(seq,inp,active){
 
 function drawHud(){
   const lab=state.hardcoreMode?'  ☠ HARDCORE':'';
-  txt(`Level  ${state.sequence.length}${lab}`, fs(18), state.hardcoreMode?C.HC:C.DIM, LW/2, LH*0.06, true);
+  txt(`Level  ${state.sequence.length}${lab}`, fs(21), state.hardcoreMode?C.HC:C.HINT, LW/2, LH*0.07, true);
 }
 
 function drawLeaderboard(cx, topY){
-  const scores=loadScores();
+  const scores=state.leaderboard;
   const mode=state.hardcoreMode?'HARDCORE':'NORMAL';
-  txt(`── TOP 5  ${mode} ──`, fs(13), C.HINT, cx, topY, true);
-  if(!scores.length){ txt('No scores yet', fs(12), C.DIM, cx, topY+LH*0.06, true); return; }
-  const lh=LH*0.054;
+  txt(`── TOP 5  ${mode} ──`, fs(19), C.HINT, cx, topY, true);
+  if(state.leaderboardLoading){ txt('Loading...', fs(16), C.HINT, cx, topY+LH*0.08, true); return; }
+  if(state.leaderboardError){ txt(state.leaderboardError, fs(15), C.BAD, cx, topY+LH*0.08, true); return; }
+  if(!scores.length){ txt('No scores yet', fs(16), C.HINT, cx, topY+LH*0.08, true); return; }
+  const lh=LH*0.078;
   scores.forEach((e,i)=>{
     const y=topY+lh*(i+1);
     const col=i===0?C.GOLD:C.HINT;
     const medal=['🥇','🥈','🥉','4.','5.'][i];
-    txt(medal,         fs(12), col, cx-LW*0.14, y, false);
-    txt(e.nick,        fs(12), col, cx-LW*0.09, y, false);
-    txt(String(e.score), fs(12), col, cx+LW*0.10, y, true);
+    txt(medal,         fs(17), col, cx-LW*0.17, y, false);
+    txt(e.nick,        fs(17), col, cx-LW*0.09, y, false);
+    txt(String(e.score), fs(17), col, cx+LW*0.13, y, true);
   });
 }
 
@@ -378,20 +583,20 @@ function drawLeaderboard(cx, topY){
 // ═══════════════════════════════════════════════
 function drawSplash(){
   ctx.fillStyle=C.BG; ctx.fillRect(0,0,LW,LH);
-  txt('MEMORY  CHALLENGE', fs(34,true), state.hardcoreMode?C.HC:C.ACCENT, LW/2, LH*0.13, true);
-  txt('How long can you keep up?', fs(14), C.DIM, LW/2, LH*0.26, true);
+  txt(document.title, fs(40,true), state.hardcoreMode?C.HC:C.ACCENT, LW/2, LH*0.14, true);
+  txt('How long can you keep up?', fs(21), C.HINT, LW/2, LH*0.28, true);
   hline(LH*0.35);
   drawLeaderboard(LW/2, LH*0.4);
 }
 
 function drawGameOver(){
-  const msgs=['Better luck next time!','Keep practising!','Nice memory!','Impressive!','Outstanding memory!'];
+  const msgs=['Better luck next time!','Keep practicing!','Nice memory!','Impressive!','Outstanding memory!'];
   const msg=msgs[Math.min(4,Math.floor(state.score/3))];
   const label=state.score!==1?'symbols':'symbol';
   ctx.fillStyle=C.BG; ctx.fillRect(0,0,LW,LH);
-  txt('GAME  OVER', fs(34,true), C.BAD, LW/2, LH*0.13, true);
-  txt(msg, fs(18), C.GOLD, LW/2, LH*0.26, true);
-  txt(`You remembered  ${state.score}  ${label}  in a row`, fs(22,true), C.WHITE, LW/2, LH*0.38, true);
+  txt('GAME  OVER', fs(38,true), C.BAD, LW/2, LH*0.14, true);
+  txt(msg, fs(21), C.GOLD, LW/2, LH*0.28, true);
+  txt(`You remembered  ${state.score}  ${label}  in a row`, fs(25,true), C.WHITE, LW/2, LH*0.4, true);
   hline(LH*0.48);
   drawLeaderboard(LW/2, LH*0.52);
 }
@@ -399,7 +604,7 @@ function drawGameOver(){
 function drawNickEntry(){
   ctx.fillStyle=C.BG; ctx.fillRect(0,0,LW,LH);
   txt('🏆  NEW HIGH SCORE!', fs(28,true), C.GOLD, LW/2, LH*0.16, true);
-  txt(`Score:  ${state.score}`, fs(22,true), C.WHITE, LH*0.28, LH*0.3, true);
+  txt(`Score:  ${state.score}`, fs(22,true), C.WHITE, LW/2, LH*0.3, true);
   txt('Enter your 3-letter nickname', fs(14), C.HINT, LW/2, LH*0.44, true);
   // Three slots
   const slotW=LW*0.09, slotH=LH*0.22, gap=LW*0.025;
@@ -442,8 +647,10 @@ function drawWrongFlash(){
 function drawShow(sym, isNew, t){
   const br=180+75*Math.abs(1-2*t), r=br/255;
   const base=isNew?[255,210,60]:[80,200,255];
+  const showSize = Math.round(Math.min(LW*0.34, LH*0.72) * FONT_THEMES[state.fontTheme].scale);
+  const showFont = `${700} ${showSize}px ${FONT_THEMES[state.fontTheme].stack}`;
   ctx.fillStyle=C.BG; ctx.fillRect(0,0,LW,LH);
-  txt(symStr(sym), fs(110,true), `rgb(${base.map(v=>Math.round(v*r)).join(',')})`, LW/2, LH*0.52, true);
+  txt(symStr(sym), showFont, `rgb(${base.map(v=>Math.round(v*r)).join(',')})`, LW/2, LH*0.52, true);
 }
 
 // ═══════════════════════════════════════════════
@@ -465,18 +672,37 @@ function setChrome(screen){
 // ═══════════════════════════════════════════════
 //  TOGGLE BUTTONS
 // ═══════════════════════════════════════════════
+function applyFontTheme(){
+  document.documentElement.style.setProperty('--ui-font', FONT_THEMES[state.fontTheme].stack);
+  document.documentElement.style.setProperty('--ui-scale', FONT_THEMES[state.fontTheme].scale);
+}
+
 function toggle(key){
   if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume();
   if(key==='s') state.soundEnabled=!state.soundEnabled;
-  if(key==='x'){ state.hardcoreMode=!state.hardcoreMode; buildRecallKbs(); }
+  if(key==='x'){
+    state.hardcoreMode=!state.hardcoreMode;
+    buildRecallKbs();
+    refreshLeaderboard();
+  }
+  if(key==='f'){
+    state.fontTheme=(state.fontTheme+1)%FONT_THEMES.length;
+    applyFontTheme();
+    buildRecallKbs();
+    buildNickKb();
+  }
   updateTogglesUI();
 }
 function updateTogglesUI(){
-  [{id:'tog-s',on:state.soundEnabled,hc:false},{id:'tog-x',on:state.hardcoreMode,hc:true}]
-  .forEach(({id,on,hc})=>{
+  [
+    {id:'tog-s',on:state.soundEnabled,hc:false,text:state.soundEnabled?'ON':'OFF'},
+    {id:'tog-x',on:state.hardcoreMode,hc:true,text:state.hardcoreMode?'ON':'OFF'},
+    {id:'tog-f',on:true,hc:false,text:FONT_THEMES[state.fontTheme].label}
+  ]
+  .forEach(({id,on,hc,text})=>{
     const el=document.getElementById(id); if(!el)return;
     el.className='tog '+(on?'on':'off')+(hc?' hc':'');
-    el.querySelector('.tog-val').textContent=on?'ON':'OFF';
+    el.querySelector('.tog-val').textContent=text;
   });
   const sb=document.getElementById('startbtn');
   sb.className='bigbtn visible'+(state.hardcoreMode?' hc':'');
@@ -486,11 +712,11 @@ function updateTogglesUI(){
 //  KEYBOARD BUILDERS
 // ═══════════════════════════════════════════════
 const QWERTY_ROWS  = ['qwertyuiop','asdfghjkl','zxcvbnm'].map(r=>r.split(''));
-const NUMPAD_ROWS  = [[7,8,9],[4,5,6],[1,2,3],[0]];
+const NUMPAD_ROWS  = [[1,2,3],[4,5,6],[7,8,9],[0]];
 
 function makeBtn(label, cls, cb){
   const b=document.createElement('button');
-  b.className=cls; b.textContent=label; b.type='button';
+  b.className=cls; b.textContent=displayText(label); b.type='button';
   b.addEventListener('pointerdown',e=>{ e.preventDefault(); cb(); });
   return b;
 }
@@ -550,10 +776,17 @@ function nickDel(){
 }
 function nickConfirm(){
   if(state.nickBuf.length!==3) return;
-  insertScore(state.nickBuf, state.score);
-  goGameOver();
+  document.getElementById('nickconfirmbtn').disabled=true;
+  insertScore(state.nickBuf, state.score)
+    .then(()=>refreshLeaderboard())
+    .catch(error=>{
+      console.error('Score insert failed:', error);
+      state.leaderboardError = 'Score save failed';
+    })
+    .finally(()=>goGameOver());
 }
 function goGameOver(){
+  state.finishingGame=false;
   state.screen='gameover';
   setChrome('gameover');
   updateTogglesUI();
@@ -596,15 +829,19 @@ function handleRecallInput(sym){
 }
 
 function endGame(){
-  if(qualifies(state.score)){
-    state.nickBuf='';
-    state.screen='nick';
-    buildNickKb();
-    document.getElementById('nickconfirmbtn').disabled=true;
-    setChrome('nick');
-  } else {
-    goGameOver();
-  }
+  refreshLeaderboard()
+    .catch(()=>{})
+    .finally(()=>{
+      if(qualifies(state.score)){
+        state.nickBuf='';
+        state.screen='nick';
+        buildNickKb();
+        document.getElementById('nickconfirmbtn').disabled=true;
+        setChrome('nick');
+      } else {
+        goGameOver();
+      }
+    });
 }
 
 // ═══════════════════════════════════════════════
@@ -630,7 +867,10 @@ function loop(now){
       break;
     case 'wrongFlash':
       drawWrongFlash();
-      if(now>=state.wrongFlashEnd) endGame();
+      if(now>=state.wrongFlashEnd && !state.finishingGame){
+        state.finishingGame=true;
+        endGame();
+      }
       break;
     case 'show':{
       const el=now-state.showStart;
@@ -669,6 +909,7 @@ document.addEventListener('keydown', e=>{
     const k=e.key.toLowerCase();
     if(k==='s'){ toggle('s'); return; }
     if(k==='x'){ toggle('x'); return; }
+    if(k==='f'){ toggle('f'); return; }
     if(e.key==='Enter'||e.key===' '){ e.preventDefault(); startGame(); }
     return;
   }
@@ -688,12 +929,19 @@ canvas.addEventListener('pointerdown', e=>{
 // ═══════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════
-buildRecallKbs();
-buildNickKb();
-setChrome('splash');
-updateTogglesUI();
-resize();
-requestAnimationFrame(loop);
+try{
+  buildRecallKbs();
+  buildNickKb();
+  applyFontTheme();
+  refreshLeaderboard();
+  setChrome('splash');
+  updateTogglesUI();
+  resize();
+  requestAnimationFrame(loop);
+}catch(error){
+  console.error('Boot failed:', error);
+  showBootError(`Boot failed:\n${error && error.message ? error.message : error}`);
+}
 </script>
 </body>
 </html>
